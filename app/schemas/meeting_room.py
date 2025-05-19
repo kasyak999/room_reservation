@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 # Базовый класс схемы, от которого наследуем все остальные.
@@ -22,3 +22,13 @@ class MeetingRoomDB(MeetingRoomCreate):
 
     class Config:
         orm_mode = True
+
+
+# Новый класс для обновления объектов.
+class MeetingRoomUpdate(MeetingRoomBase):
+
+    @validator('name')
+    def name_cannot_be_null(cls, value):
+        if value is None:
+            raise ValueError('Имя переговорки не может быть пустым!')
+        return value

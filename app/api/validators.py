@@ -3,7 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Вместо импортов 6 функций импортируйте объект meeting_room_crud.
 from app.crud.meeting_room import meeting_room_crud
 from app.crud.reservation import reservation_crud
-from app.models.meeting_room import MeetingRoom
+# Так как в Python-пакете app.models модели импортированы в __init__.py,
+# импортировать их можно прямо из пакета.
+from app.models import MeetingRoom, Reservation
 
 
 async def check_name_duplicate(
@@ -35,11 +37,23 @@ async def check_meeting_room_exists(
 
 async def check_reservation_intersections(**kwargs) -> None:
     """Пповерка переговорки"""
-    reservations = await reservation_crud.get_reservations_at_the_same_time(
-        **kwargs)
+    reservations = await reservation_crud.get_reservations_at_the_same_time(**kwargs)
     if reservations:
         raise HTTPException(
             status_code=422,
             detail=str(reservations)
         )
     return None
+
+
+async def check_reservation_before_edit(
+    reservation_id: int,
+    session: AsyncSession
+) -> Reservation:
+    reservation = await reservation_crud.get(reservation_id, session)
+    if not reservation:
+        raise HTTPException(
+            status_code=404,
+            detail='Бронь не найдена!'
+        )
+    return reservation

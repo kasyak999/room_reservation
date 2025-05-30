@@ -10,6 +10,10 @@ from app.schemas.meeting_room import (
 )
 from app.schemas.reservation import ReservationDB
 from app.api.validators import check_name_duplicate, check_meeting_room_exists
+# Добавьте импорт зависимости, определяющей, 
+# что текущий пользователь - суперюзер.
+from app.core.user import current_superuser
+
 
 router = APIRouter()
 
@@ -18,6 +22,8 @@ router = APIRouter()
     '/',
     response_model=MeetingRoomDB,
     response_model_exclude_none=True,
+    # Добавьте вызов зависимости при обработке запроса.
+    dependencies=[Depends(current_superuser)],
 )
 async def create_new_meeting_room(
         meeting_room: MeetingRoomCreate,
@@ -46,6 +52,7 @@ async def get_all_meeting_rooms(
     '/{meeting_room_id}',
     response_model=MeetingRoomDB,
     response_model_exclude_none=True,
+    dependencies=[Depends(current_superuser)],
 )
 async def partially_update_meeting_room(
         meeting_room_id: int,
@@ -70,6 +77,7 @@ async def partially_update_meeting_room(
     '/{meeting_room_id}',
     response_model=MeetingRoomDB,
     response_model_exclude_none=True,
+    dependencies=[Depends(current_superuser)],
 )
 async def remove_meeting_room(
         meeting_room_id: int,
@@ -84,6 +92,7 @@ async def remove_meeting_room(
 @router.get(
     '/{meeting_room_id}/reservations',
     response_model=list[ReservationDB],
+    response_model_exclude={'user_id'},
 )
 async def get_reservations_for_room(
     meeting_room_id: int,

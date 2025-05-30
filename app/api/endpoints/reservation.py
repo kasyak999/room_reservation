@@ -11,6 +11,8 @@ from app.crud.reservation import reservation_crud
 from app.core.db import get_async_session
 from app.schemas.reservation import (
     ReservationDB, ReservationCreate, ReservationUpdate)
+from app.core.user import current_user, current_superuser
+from app.models import User
 
 
 router = APIRouter()
@@ -20,6 +22,8 @@ router = APIRouter()
 async def create_reservation(
     reservation: ReservationCreate,
     session: AsyncSession = Depends(get_async_session),
+    # Получаем текущего пользователя и сохраняем в переменную user.
+    user: User = Depends(current_user),
 ):
     await check_meeting_room_exists(
         reservation.meetingroom_id, session
@@ -30,12 +34,16 @@ async def create_reservation(
         **reservation.dict(), session=session
     )
     new_reservation = await reservation_crud.create(
-        reservation, session
+        # Передаём объект пользователя в метод создания объекта бронирования.
+        reservation, session, user
     )
     return new_reservation
 
 
-@router.get('/', response_model=list[ReservationDB])
+@router.get(
+    '/', response_model=list[ReservationDB],
+    dependencies=[Depends(current_superuser)],
+)
 async def get_all_reservations(
     session: AsyncSession = Depends(get_async_session),
 ):
@@ -50,9 +58,12 @@ async def get_all_reservations(
 async def delete_reservation(
         reservation_id: int,
         session: AsyncSession = Depends(get_async_session),
+        user: User = Depends(current_user),
 ):
+    """Для суперюзеров или создателей объекта бронирования"""
     # Проверяем, что такой объект бронирования вообще существует.
-    reservation = await check_reservation_before_edit(reservation_id, session)
+    reservation = await check_reservation_before_edit(
+        reservation_id, session, user)
     reservation = await reservation_crud.remove(reservation, session)
     return reservation
 
@@ -62,9 +73,12 @@ async def update_reservation(
         reservation_id: int,
         obj_in: ReservationUpdate,
         session: AsyncSession = Depends(get_async_session),
+        user: User = Depends(current_user),
 ):
+    """Для суперюзеров или создателей объекта бронирования"""
     # Проверяем, что такой объект бронирования вообще существует.
-    reservation = await check_reservation_before_edit(reservation_id, session)
+    reservation = await check_reservation_before_edit(
+        reservation_id, session, user)
     # Проверяем, что нет пересечений с другими бронированиями.
     await check_reservation_intersections(
         # Новое время бронирования, распакованное на ключевые аргументы.
@@ -82,3 +96,19 @@ async def update_reservation(
         session=session,
     )
     return reservation
+
+
+@router.get(
+    '/my_reservations', response_model=list[ReservationDB],
+    dependencies=[Depends(current_superuser)],
+    response_model_exclude={'user_id'},
+)
+async def get_my_reservations(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Получает список всех бронирований для текущего пользователя."""
+    reservations = await reservation_crud.get_by_user(
+        session=session, user=user
+    )
+    return reservations
